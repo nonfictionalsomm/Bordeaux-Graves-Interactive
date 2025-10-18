@@ -563,9 +563,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function createVintageChart() {
         const ctx = document.getElementById('vintageChart').getContext('2d');
+        // Create a deep copy of the data to prevent the original from being mutated by chart updates.
+        const chartData = JSON.parse(JSON.stringify(vintageData));
         vintageChart = new Chart(ctx, {
             type: 'bar',
-            data: vintageData,
+            data: chartData,
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -612,7 +614,6 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let filteredLabels = [];
             let filteredData = [];
-            let filteredMeta = [];
 
             if (filter === 'all') {
                 filteredLabels = vintageData.labels;
@@ -695,3 +696,4 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
