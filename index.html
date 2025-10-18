@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Graves Appellations of Bordeaux: An Interactive Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chosen Palette: Earthen Harmony -->
+    <!-- Application Structure Plan: The application is a single-page dashboard with a persistent left-hand navigation sidebar. This structure was chosen over a linear report format to empower user-driven exploration. Users can immediately jump to any topic of interest (e.g., Vintages, specific Appellations) without scrolling through preceding information. The core interaction is an appellation selector that dynamically updates a central content panel. This allows for direct comparison of AOPs, which is a primary learning objective. This non-linear, thematic approach enhances usability by organizing complex information into digestible, interconnected modules, making the data more accessible and engaging than a static document. -->
+    <!-- Visualization & Content Choices: 
+        - Appellation Data: Report Info -> Details of 6 AOPs. Goal -> Compare AOPs. Viz/Method -> Interactive content panel updated by clicking AOP buttons. Interaction -> User click selects an AOP, dynamically loading its specific laws, styles, and terroir notes. Justification -> Facilitates direct, side-by-side comparison, which is crucial for understanding the region's nuances. Library/Method -> Vanilla JS DOM manipulation.
+        - Grape Blends: Report Info -> Typical grape compositions. Goal -> Inform on blend philosophy. Viz/Method -> A dynamic Chart.js doughnut chart. Interaction -> The chart updates when a new AOP is selected to show its characteristic blend. Justification -> Visually and immediately communicates the "blend-based" identity of Bordeaux wines. Library/Method -> Chart.js.
+        - Vintage Analysis: Report Info -> 20 years of vintage data. Goal -> Organize and compare vintages by character. Viz/Method -> A Chart.js bar chart for quality ratings. Interaction -> Filter buttons ('Hot/Dry', 'Classic', etc.) redraw the chart to show only relevant years and update a descriptive text block. Justification -> Transforms a static data table into an exploratory tool, revealing patterns and trends. Library/Method -> Chart.js + Vanilla JS filtering.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        body {
+            font-family: 'Source Sans 3', sans-serif;
+            background-color: #FDFBF8; 
+            color: #4B4B4B;
+        }
+        h1, h2, h3, h4 {
+            font-family: 'Merriweather', serif;
+        }
+        .nav-link {
+            transition: all 0.2s ease-in-out;
+            border-left: 3px solid transparent;
+        }
+        .nav-link.active {
+            background-color: #F4ECE3;
+            border-left-color: #8C2D19;
+            color: #8C2D19;
+            font-weight: 600;
+        }
+        .nav-link:hover {
+            background-color: #F4ECE3;
+            border-left-color: #B0A191;
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+        .aop-button {
+            transition: all 0.2s ease-in-out;
+        }
+        .aop-button.active {
+            background-color: #8C2D19;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .vintage-btn.active {
+            background-color: #4A5568;
+            color: white;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-[#FDFBF8]">
+    <div class="flex min-h-screen">
+        <aside class="w-64 bg-[#F8F3ED] text-gray-700 p-4 fixed h-full shadow-md z-10 hidden md:block">
+            <h1 class="text-2xl font-bold text-[#8C2D19] mb-6 border-b border-gray-300 pb-4">The Graves</h1>
+            <nav id="main-nav">
+                <a href="#overview" class="nav-link active block py-2.5 px-4 rounded">Overview</a>
+                <a href="#appellations" class="nav-link block py-2.5 px-4 rounded">Appellations</a>
+                <a href="#terroir" class="nav-link block py-2.5 px-4 rounded">Terroir</a>
+                <a href="#grapes" class="nav-link block py-2.5 px-4 rounded">Grapes & Viticulture</a>
+                <a href="#winemaking" class="nav-link block py-2.5 px-4 rounded">Winemaking</a>
+                <a href="#vintages" class="nav-link block py-2.5 px-4 rounded">Vintages</a>
+                <a href="#gastronomy" class="nav-link block py-2.5 px-4 rounded">Gastronomy</a>
+            </nav>
+        </aside>
+
+        <main class="flex-1 md:ml-64 p-4 sm:p-8">
+            <button id="mobile-menu-btn" class="md:hidden fixed top-4 right-4 bg-[#F8F3ED] p-2 rounded shadow-lg z-30">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+            </button>
+            <div id="mobile-nav" class="hidden fixed inset-0 bg-black bg-opacity-50 z-20">
+                <div class="w-64 bg-[#F8F3ED] h-full p-4">
+                    <h1 class="text-2xl font-bold text-[#8C2D19] mb-6 border-b border-gray-300 pb-4">The Graves</h1>
+                     <nav id="mobile-main-nav">
+                        <a href="#overview" class="nav-link active block py-2.5 px-4 rounded">Overview</a>
+                        <a href="#appellations" class="nav-link block py-2.5 px-4 rounded">Appellations</a>
+                        <a href="#terroir" class="nav-link block py-2.5 px-4 rounded">Terroir</a>
+                        <a href="#grapes" class="nav-link block py-2.5 px-4 rounded">Grapes & Viticulture</a>
+                        <a href="#winemaking" class="nav-link block py-2.5 px-4 rounded">Winemaking</a>
+                        <a href="#vintages" class="nav-link block py-2.5 px-4 rounded">Vintages</a>
+                        <a href="#gastronomy" class="nav-link block py-2.5 px-4 rounded">Gastronomy</a>
+                    </nav>
+                </div>
+            </div>
+
+            <div id="overview" class="content-section active">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">An Interactive Analysis of the Graves Appellations</h2>
+                <p class="text-lg text-gray-600 mb-6">This application provides a data-driven exploration of the Graves region of Bordeaux, the historical birthplace of its finest wines. Named for its gravelly soils ("Graves"), the area is unique for producing world-class dry red, dry white, and sweet white wines. Use the navigation to explore the specific appellations, understand the terroir, analyze vintage variations, and discover the region's rich gastronomic culture. This interactive guide is designed to synthesize official data from regulatory bodies and academic sources into an accessible and educational format for advanced study.</p>
+                <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                    <h3 class="text-2xl font-semibold text-[#8C2D19] mb-3">Hierarchy of the Graves Appellations</h3>
+                    <p class="mb-4 text-gray-600">The Graves region is organized into a clear hierarchy of Appellations d'Origine Protégée (AOPs), each with distinct regulations and styles. The communal appellations represent the highest tier of quality and specificity, nested within the broader regional AOPs.</p>
+                    <div class="text-gray-700 space-y-2">
+                        <div class="font-bold text-lg">▶ Graves (Regional)</div>
+                        <div class="ml-6">
+                            <div class="font-semibold text-md">▷ Pessac-Léognan (Communal AOP - Est. 1987)</div>
+                            <p class="ml-6 text-sm text-gray-600">The most prestigious sub-region for dry red and dry white wines. All 1855 classified growths of Graves are located here.</p>
+                        </div>
+                        <div class="ml-6">
+                            <div class="font-semibold text-md">▷ Graves (AOP)</div>
+                            <p class="ml-6 text-sm text-gray-600">The original, larger appellation producing red and dry white wines south of Pessac-Léognan.</p>
+                        </div>
+                         <div class="ml-6">
+                            <div class="font-semibold text-md">▷ Cérons (Communal AOP)</div>
+                            <p class="ml-6 text-sm text-gray-600">An enclave within Graves known for its sweet white wines.</p>
+                        </div>
+                        <div class="font-bold text-lg mt-4">▶ Sweet Wine Appellations (Regional)</div>
+                        <div class="ml-6">
+                            <div class="font-semibold text-md">▷ Sauternes (Communal AOP)</div>
+                            <p class="ml-6 text-sm text-gray-600">The world's most famous region for botrytized sweet wines. Contains the commune of Barsac.</p>
+                        </div>
+                         <div class="ml-6">
+                            <div class="font-semibold text-md">▷ Barsac (Communal AOP)</div>
+                            <p class="ml-6 text-sm text-gray-600">A commune within Sauternes that may label its wines as either Barsac or Sauternes, known for a slightly lighter, fresher style.</p>
+                        </div>
+                        <div class="ml-6">
+                            <div class="font-semibold text-md">▷ Graves Supérieures (AOP)</div>
+                            <p class="ml-6 text-sm text-gray-600">A broader designation for sweet white wines from the Graves region with less stringent production rules than Sauternes.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="appellations" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Explore the Appellations</h2>
+                <p class="text-lg text-gray-600 mb-6">Select an appellation to view its specific characteristics, including its primary wine styles, key grape varieties, and legal requirements. This section allows for a direct comparison of what makes each AOP unique within the broader Graves terroir.</p>
+                <div id="aop-selector" class="flex flex-wrap gap-2 mb-6">
+                    <button data-aop="pessac" class="aop-button active px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">Pessac-Léognan</button>
+                    <button data-aop="graves" class="aop-button px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">Graves</button>
+                    <button data-aop="sauternes" class="aop-button px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">Sauternes & Barsac</button>
+                    <button data-aop="cerons" class="aop-button px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">Cérons</button>
+                    <button data-aop="graves-sup" class="aop-button px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50">Graves Supérieures</button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                    <div id="aop-details" class="lg:col-span-3 bg-white rounded-lg shadow p-6 border border-gray-200">
+                    </div>
+                    <div class="lg:col-span-2 bg-white rounded-lg shadow p-6 border border-gray-200 flex flex-col items-center justify-center">
+                        <h3 id="chart-title" class="text-xl font-semibold text-center text-[#8C2D19] mb-4">Typical Blend</h3>
+                        <div class="chart-container h-64 md:h-80 w-full max-w-sm">
+                            <canvas id="aopBlendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="terroir" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Geology, Geography, and Climate</h2>
+                 <p class="text-lg text-gray-600 mb-6">The identity of Graves is intrinsically linked to its unique terroir. This section details the geological foundation, geographical boundaries, and climatic conditions that enable the production of its diverse and celebrated wine styles. The interplay of these factors is critical to understanding the nuances between the various appellations.</p>
+                <div class="space-y-6">
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-2xl font-semibold text-[#8C2D19] mb-3">Geology: The "Graves"</h3>
+                        <p class="text-gray-700">The region's name, "Graves," translates to "gravel," directly referencing its dominant soil type. These soils are composed of pebbles and stones (quartz and quartzite) deposited by the Garonne River over geological epochs. The key characteristics of these soils are:</p>
+                        <ul class="list-disc list-inside mt-2 text-gray-600 space-y-1">
+                            <li><strong>Excellent Drainage:</strong> The gravel allows water to drain away quickly, forcing vine roots to dig deep for hydration and nutrients.</li>
+                            <li><strong>Heat Retention:</strong> The stones absorb solar heat during the day and radiate it back at night, aiding grape ripening, particularly for late-ripening varieties like Cabernet Sauvignon.</li>
+                            <li><strong>Varying Depth & Composition:</strong> Soil composition varies, with the deepest gravel beds found in Pessac-Léognan, often mixed with sand and clay over a limestone or clay subsoil. Sauternes and Barsac feature more alluvial clay and limestone, which is conducive to the development of botrytis.</li>
+                        </ul>
+                    </div>
+                     <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-2xl font-semibold text-[#8C2D19] mb-3">Geography & Climate</h3>
+                        <p class="text-gray-700 mb-2">Located on the Left Bank of the Garonne River, south of the city of Bordeaux, the Graves region experiences a moderate maritime climate.</p>
+                        <ul class="list-disc list-inside mt-2 text-gray-600 space-y-1">
+                            <li><strong>Boundaries:</strong> The region stretches for approximately 50 kilometers, bordered by the Garonne to the east and the vast Landes forest to the west, which provides a crucial shield from Atlantic storms.</li>
+                            <li><strong>Sauternes Microclimate:</strong> The sweet wine appellations benefit from a unique microclimate created by the cool Ciron tributary flowing into the warmer Garonne. This confluence generates morning mists in autumn, which are essential for the development of Noble Rot (*Botrytis cinerea*), followed by sunny afternoons that concentrate the sugars in the grapes.</li>
+                            <li><strong>Climate Data (30-year avg.):</strong> Growing Degree Days (GDD) typically range from 1600-1700°C. Annual precipitation is around 930mm.</li>
+                            <li><strong>Top Viticultural Risks:</strong> The primary risks are spring frost (which can damage budding vines), high humidity leading to fungal diseases like mildew, and excessive rainfall during flowering or harvest, which can dilute grape quality.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="grapes" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Grapes & Viticulture</h2>
+                <p class="text-lg text-gray-600 mb-6">The classic wines of Graves are blends, with specific grape varieties legally mandated for each style. Vineyard management practices are tightly regulated by AOP laws to ensure quality, focusing on planting density and yield control to promote grape concentration and complexity.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-2xl font-semibold text-[#8C2D19] mb-3">Principal White Grapes</h3>
+                        <div class="space-y-3">
+                            <p><strong>Sémillon:</strong> The dominant white grape, especially for sweet wines. It has a thin skin, making it susceptible to botrytis. Provides wines with body, richness, and honeyed, waxy notes that age beautifully.</p>
+                            <p><strong>Sauvignon Blanc:</strong> Crucial for both dry and sweet whites. It contributes high acidity, freshness, and aromatic notes of citrus, gooseberry, and grass. It provides the acidic backbone in sweet wines to balance the richness.</p>
+                             <p><strong>Muscadelle:</strong> Used in smaller quantities, it adds expressive floral and grapey aromatics to blends.</p>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-2xl font-semibold text-[#8C2D19] mb-3">Principal Red Grapes</h3>
+                        <div class="space-y-3">
+                             <p><strong>Cabernet Sauvignon:</strong> Thrives on the well-drained gravel soils. It provides structure, firm tannins, longevity, and classic aromas of blackcurrant, cedar, and tobacco.</p>
+                            <p><strong>Merlot:</strong> Adds softness, body, and ripe fruit flavors of plum and black cherry. It ripens earlier than Cabernet Sauvignon and dominates blends in areas with more clay.</p>
+                            <p><strong>Cabernet Franc:</strong> Contributes aromatic complexity with notes of raspberry and violet, along with finer tannins and freshness.</p>
+                        </div>
+                    </div>
+                </div>
+                 <div class="mt-6 bg-white rounded-lg shadow p-6 border border-gray-200">
+                    <h3 class="text-2xl font-semibold text-[#8C2D19] mb-3">Vineyard Management Regulations</h3>
+                    <p class="text-gray-700">AOP laws strictly define vineyard practices to maintain quality standards across the region:</p>
+                    <ul class="list-disc list-inside mt-2 text-gray-600 space-y-1">
+                        <li><strong>Planting Density:</strong> Minimum densities are high, typically ranging from 6,500 to 10,000 vines per hectare. This encourages competition between vines, leading to lower individual yields and more concentrated grapes.</li>
+                        <li><strong>Yields:</strong> Maximum yields are legally defined and vary by appellation and wine style. For example, yields for Sauternes are drastically low (max 25 hl/ha) due to the selective harvesting of botrytized grapes, often requiring multiple passes (tries) through the vineyard. Dry red and white yields are typically in the 45-55 hl/ha range.</li>
+                        <li><strong>Vine Training:</strong> The most common system is Guyot Double, which helps manage vigor and ensure optimal sun exposure for the grape clusters.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div id="winemaking" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Winemaking & Styles</h2>
+                <p class="text-lg text-gray-600 mb-6">The winemaking traditions in Graves are as diverse as its terroirs, with distinct methods for its three signature wine styles. Legal requirements for aging, alcohol levels, and grape composition are meticulously defined by the INAO to protect the identity and quality of each appellation.</p>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-xl font-semibold text-[#8C2D19] mb-3">Dry White Wines</h3>
+                        <p class="text-gray-600 font-medium mb-2">(Graves, Pessac-Léognan)</p>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            <li><strong>Grapes:</strong> Primarily Sauvignon Blanc and Sémillon.</li>
+                            <li><strong>Fermentation:</strong> Often fermented and aged in oak barrels (barriques), which adds complexity, texture, and notes of vanilla and spice. Modern styles may use stainless steel for a fresher, fruit-forward profile.</li>
+                            <li><strong>Aging:</strong> Frequently aged on the lees (sur lie) with bâtonnage (lees stirring) to enhance richness and body.</li>
+                             <li><strong>Alcohol:</strong> Minimum potential alcohol is typically around 11.5%.</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-xl font-semibold text-[#8C2D19] mb-3">Red Wines</h3>
+                        <p class="text-gray-600 font-medium mb-2">(Graves, Pessac-Léognan)</p>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                             <li><strong>Grapes:</strong> Blend of Cabernet Sauvignon, Merlot, and Cabernet Franc.</li>
+                            <li><strong>Fermentation:</strong> Vinified in stainless steel, concrete, or large wooden vats. Maceration times vary to extract color, flavor, and tannin.</li>
+                            <li><strong>Aging:</strong> Mandatory aging in oak barrels, particularly for Pessac-Léognan, which can see up to 22 months in new or used French oak barriques. This integrates tannins and develops complex tertiary aromas.</li>
+                             <li><strong>Alcohol:</strong> Minimum potential alcohol is typically around 11%.</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-xl font-semibold text-[#8C2D19] mb-3">Sweet White Wines</h3>
+                        <p class="text-gray-600 font-medium mb-2">(Sauternes, Barsac, Cérons, etc.)</p>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            <li><strong>Grapes:</strong> Primarily Sémillon, with Sauvignon Blanc and Muscadelle. Grapes must be affected by *Botrytis cinerea* (noble rot).</li>
+                            <li><strong>Harvest:</strong> Painstakingly harvested by hand in multiple passes (tries) to select only the perfectly botrytized berries.</li>
+                            <li><strong>Fermentation:</strong> Slow fermentation in oak barrels, which can naturally stop due to high sugar levels, leaving significant residual sugar.</li>
+                            <li><strong>Aging:</strong> Long aging periods in oak barrels (18-36 months) are common to develop the wine's signature complexity, balancing intense sweetness with acidity.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="vintages" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Vintage Analysis (2005-2024)</h2>
+                 <p class="text-lg text-gray-600 mb-6">Vintage quality in Bordeaux is highly dependent on the year's weather conditions. Use the filters below to explore how different climatic patterns—from hot and dry to cool and wet—have shaped the character of Graves wines over the past two decades. The chart displays a consensus rating for each vintage.</p>
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <button class="vintage-btn active px-3 py-1 bg-gray-200 text-gray-800 text-sm rounded-md" data-filter="all">All Vintages</button>
+                    <button class="vintage-btn px-3 py-1 bg-gray-200 text-gray-800 text-sm rounded-md" data-filter="hot">Hot & Dry</button>
+                    <button class="vintage-btn px-3 py-1 bg-gray-200 text-gray-800 text-sm rounded-md" data-filter="classic">Classic & Balanced</button>
+                    <button class="vintage-btn px-3 py-1 bg-gray-200 text-gray-800 text-sm rounded-md" data-filter="cool">Cool & Wet</button>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                    <div class="chart-container">
+                        <canvas id="vintageChart"></canvas>
+                    </div>
+                    <div id="vintage-description" class="mt-6 text-gray-700">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">All Vintages</h3>
+                        <p>This view shows the overall quality ratings for Graves wines from 2005 to 2024. The region has experienced a remarkable string of successful vintages, particularly in the last decade, interspersed with more challenging years that required diligent work in the vineyard and cellar.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="gastronomy" class="content-section">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Gastronomy & Local Pairings</h2>
+                <p class="text-lg text-gray-600 mb-6">The wines of Graves are deeply rooted in the rich culinary traditions of Southwest France. The region's diverse wine styles offer a wide spectrum of pairing possibilities, from savory local meats and seafood to world-renowned desserts and cheeses.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-xl font-semibold text-[#8C2D19] mb-2">Agneau de Pauillac</h3>
+                        <p class="text-gray-600">Milk-fed lamb from the nearby Pauillac region, prized for its tenderness. Classically roasted with garlic and herbs.</p>
+                        <p class="text-sm font-semibold mt-3 text-gray-800">Pairing: Aged Pessac-Léognan rouge. The wine's cassis fruit, earthy notes, and refined tannins complement the delicate flavor of the lamb.</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-xl font-semibold text-[#8C2D19] mb-2">Oysters from Arcachon Bay</h3>
+                        <p class="text-gray-600">Fresh, briny oysters from the nearby coastal bay.</p>
+                        <p class="text-sm font-semibold mt-3 text-gray-800">Pairing: Young, unoaked Graves or Pessac-Léognan blanc. The wine's crisp acidity and citrus notes cut through the salinity of the oysters.</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-xl font-semibold text-[#8C2D19] mb-2">Foie Gras</h3>
+                        <p class="text-gray-600">A quintessential delicacy of the region, often served seared (poêlé) or as a chilled terrine.</p>
+                        <p class="text-sm font-semibold mt-3 text-gray-800">Pairing: Sauternes or Barsac. This is one of the world's classic pairings; the wine's sweetness and acidity cut through the richness of the liver, creating a sublime balance.</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-xl font-semibold text-[#8C2D19] mb-2">Cèpes de Bordeaux</h3>
+                        <p class="text-gray-600">Local porcini mushrooms, known for their deep, earthy flavor, often sautéed with garlic and parsley.</p>
+                        <p class="text-sm font-semibold mt-3 text-gray-800">Pairing: Mature Graves rouge. The mushroom notes in an aged red wine echo the flavors of the dish perfectly.</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-xl font-semibold text-[#8C2D19] mb-2">Roquefort Cheese</h3>
+                        <p class="text-gray-600">A powerful, salty blue sheep's milk cheese.</p>
+                        <p class="text-sm font-semibold mt-3 text-gray-800">Pairing: Sauternes. The intense sweetness of the wine provides a stunning contrast to the sharp saltiness of the cheese.</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <h3 class="text-xl font-semibold text-[#8C2D19] mb-2">Canelés</h3>
+                        <p class="text-gray-600">A small Bordelais pastry with a rich, custardy interior and a thick, caramelized crust, flavored with rum and vanilla.</p>
+                        <p class="text-sm font-semibold mt-3 text-gray-800">Pairing: While often enjoyed with coffee, a lighter-style Graves Supérieures can be a delightful match.</p>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const aopData = {
+        pessac: {
+            name: "Pessac-Léognan",
+            title: "Pessac-Léognan: The Aristocracy of Graves",
+            description: "Established in 1987, Pessac-Léognan was created to recognize the superior terroir of the northern Graves communes. It is home to all of the 1855 classified growths of the Graves, including the First Growth Château Haut-Brion. The wines, both red and white, are known for their structure, complexity, and exceptional aging potential.",
+            styles: [
+                "<strong>Dry Red:</strong> Cabernet Sauvignon dominant blends, known for their power, firm tannic structure, and notes of cassis, tobacco, and smoky minerals.",
+                "<strong>Dry White:</strong> Sauvignon Blanc/Sémillon blends, often barrel-fermented and aged, showing complexity, texture, and flavors of citrus, beeswax, and lanolin.",
+            ],
+            producers: "Château Haut-Brion, Château La Mission Haut-Brion, Domaine de Chevalier, Château Smith Haut Lafitte.",
+            chart: {
+                labels: ['Cabernet Sauvignon', 'Merlot', 'Sauvignon Blanc', 'Sémillon'],
+                datasets: [{
+                    label: 'Red Blend',
+                    data: [60, 40, 0, 0],
+                    backgroundColor: ['#6D282B', '#A43A3F', '#FDEBD0', '#F7DC6F'],
+                }, {
+                    label: 'White Blend',
+                    data: [0, 0, 55, 45],
+                     backgroundColor: ['#6D282B', '#A43A3F', '#FDEBD0', '#F7DC6F'],
+                }]
+            },
+            chartTitle: "Pessac-Léognan Blends"
+        },
+        graves: {
+            name: "Graves",
+            title: "Graves: The Historic Birthplace",
+            description: "The broader Graves AOP covers the area south of Pessac-Léognan. While it shares the gravelly soil profile, the terroir is more varied, with higher proportions of sand and clay. The wines offer excellent value and a more approachable character in their youth compared to their northern neighbors.",
+            styles: [
+                 "<strong>Dry Red:</strong> Often Merlot-dominant, these wines are softer and fruitier than Pessac-Léognan, with ripe red fruit and earthy notes.",
+                "<strong>Dry White:</strong> Typically dominated by Sauvignon Blanc, these are fresh, aromatic, and citrus-driven wines, often produced without oak.",
+            ],
+            producers: "Château de Cérons, Château de Portets, Château Rahoul.",
+             chart: {
+                labels: ['Merlot', 'Cabernet Sauvignon', 'Sauvignon Blanc', 'Sémillon'],
+                 datasets: [{
+                    label: 'Red Blend',
+                    data: [55, 45, 0, 0],
+                    backgroundColor: ['#A43A3F', '#6D282B', '#FDEBD0', '#F7DC6F'],
+                }, {
+                    label: 'White Blend',
+                    data: [0, 0, 65, 35],
+                     backgroundColor: ['#A43A3F', '#6D282B', '#FDEBD0', '#F7DC6F'],
+                }]
+            },
+            chartTitle: "Graves AOP Blends"
+        },
+        sauternes: {
+            name: "Sauternes & Barsac",
+            title: "Sauternes & Barsac: The Magic of Noble Rot",
+            description: "This world-renowned region is dedicated to the production of sweet wines from grapes affected by *Botrytis cinerea* (noble rot). The unique microclimate created by the Ciron and Garonne rivers provides the ideal misty autumn conditions for the fungus to develop. The resulting wines are luscious, complex, and can age for decades, developing incredible nuance.",
+            styles: [
+                "<strong>Sweet White (Botrytized):</strong> A blend of Sémillon, Sauvignon Blanc, and Muscadelle. Legally requires a minimum of 13% alcohol and high residual sugar levels. Wines show notes of apricot, honey, saffron, and almond.",
+                "<strong>Barsac Distinction:</strong> Wines from the commune of Barsac, which has more limestone in its soil, can be labeled as either Sauternes or Barsac. They are often perceived as having a slightly lighter body and higher acidity."
+            ],
+            producers: "Château d'Yquem, Château Climens (Barsac), Château Coutet (Barsac), Château Suduiraut.",
+             chart: {
+                labels: ['Sémillon', 'Sauvignon Blanc', 'Muscadelle'],
+                 datasets: [{
+                    label: 'Sweet Blend',
+                    data: [80, 18, 2],
+                    backgroundColor: ['#F7DC6F', '#FDEBD0', '#FEF9E7'],
+                }]
+            },
+            chartTitle: "Sauternes Sweet Blend"
+        },
+        cerons: {
+            name: "Cérons",
+            title: "Cérons: The Hidden Gem",
+            description: "Cérons is a small appellation for sweet wines, forming an enclave within the larger Graves AOP. Like its famous neighbor Sauternes, it relies on botrytized grapes, but the wines are often lighter in style and offer exceptional value. The terroir is a mix of gravel and limestone-clay.",
+            styles: [
+                "<strong>Sweet White (Botrytized):</strong> Made from Sémillon, Sauvignon Blanc, and Muscadelle. The wines are less luscious than Sauternes but still display classic notes of honey, candied citrus, and acacia.",
+            ],
+            producers: "Château de Cérons, Grand Enclos du Château de Cérons.",
+             chart: {
+                labels: ['Sémillon', 'Sauvignon Blanc', 'Muscadelle'],
+                 datasets: [{
+                    label: 'Sweet Blend',
+                    data: [75, 20, 5],
+                    backgroundColor: ['#F7DC6F', '#FDEBD0', '#FEF9E7'],
+                }]
+            },
+            chartTitle: "Cérons Sweet Blend"
+        },
+        'graves-sup': {
+            name: "Graves Supérieures",
+            title: "Graves Supérieures: Approachable Sweetness",
+            description: "This appellation covers the same area as the Graves AOP but is designated for sweet white wines (moelleux). The production standards are less strict than those for Sauternes or Cérons, particularly regarding harvest methods (botrytis is not mandatory, only late-harvested grapes).",
+            styles: [
+                "<strong>Sweet White (Late Harvest):</strong> Primarily Sémillon-based. These wines are sweet and fruity, with notes of ripe pear and honey, but generally lack the complexity and concentration of botrytized wines.",
+            ],
+            producers: "Often produced by the same châteaux that make dry Graves AOP wines.",
+            chart: {
+                labels: ['Sémillon', 'Sauvignon Blanc'],
+                 datasets: [{
+                    label: 'Sweet Blend',
+                    data: [85, 15],
+                    backgroundColor: ['#F7DC6F', '#FDEBD0'],
+                }]
+            },
+            chartTitle: "Graves Supérieures Blend"
+        }
+    };
+
+    const vintageData = {
+        labels: ['2005', '2006', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024'],
+        datasets: [{
+            label: 'Vintage Rating',
+            data: [5, 4, 3, 4, 5, 5, 3, 4, 2, 4, 5, 5, 3, 5, 5, 5, 3, 5, 4, 4],
+            backgroundColor: (context) => {
+                const value = context.raw;
+                if (value === 5) return 'rgba(109, 40, 43, 0.8)'; // Excellent
+                if (value === 4) return 'rgba(164, 58, 63, 0.7)'; // Good
+                if (value === 3) return 'rgba(176, 161, 145, 0.7)'; // Fair
+                return 'rgba(200, 200, 200, 0.6)'; // Poor
+            },
+            borderColor: (context) => {
+                 const value = context.raw;
+                if (value === 5) return 'rgba(109, 40, 43, 1)';
+                if (value === 4) return 'rgba(164, 58, 63, 1)';
+                if (value === 3) return 'rgba(176, 161, 145, 1)';
+                return 'rgba(200, 200, 200, 1)';
+            },
+            borderWidth: 1,
+            meta: [
+                { year: '2005', type: 'hot' }, { year: '2006', type: 'classic' }, { year: '2007', type: 'cool' }, 
+                { year: '2008', type: 'classic' }, { year: '2009', type: 'hot' }, { year: '2010', type: 'hot' },
+                { year: '2011', type: 'cool' }, { year: '2012', type: 'classic' }, { year: '2013', type: 'cool' },
+                { year: '2014', type: 'classic' }, { year: '2015', type: 'hot' }, { year: '2016', type: 'hot' },
+                { year: '2017', type: 'classic' }, { year: '2018', type: 'hot' }, { year: '2019', type: 'hot' },
+                { year: '2020', type: 'hot' }, { year: '2021', type: 'cool' }, { year: '2022', type: 'hot' },
+                { year: '2023', type: 'classic' }, { year: '2024', type: 'classic' }
+            ]
+        }]
+    };
+    
+    const vintageDescriptions = {
+        all: {
+            title: "All Vintages",
+            text: "This view shows the overall quality ratings for Graves wines from 2005 to 2024. The region has experienced a remarkable string of successful vintages, particularly in the last decade, interspersed with more challenging years that required diligent work in the vineyard and cellar."
+        },
+        hot: {
+            title: "Hot & Dry Vintages",
+            text: "Years characterized by significant heat and drought. These conditions lead to very ripe, powerful, and concentrated wines, both red and white. Reds are typically rich and full-bodied, while sweet wines can be exceptionally luscious. Vintages include: 2005, 2009, 2010, 2015, 2016, 2018, 2019, 2020, 2022."
+        },
+        classic: {
+            title: "Classic & Balanced Vintages",
+            text: "These years represent a more traditional Bordelais climate with balanced sun and rain. The wines are prized for their elegance, freshness, and structure, offering excellent aging potential without the overt power of hotter years. Vintages include: 2006, 2008, 2012, 2014, 2017 (frost affected), 2023, 2024."
+        },
+        cool: {
+            title: "Cool & Wet Vintages",
+            text: "Challenging years marked by cooler temperatures and higher rainfall, especially around harvest. These vintages produce lighter-bodied wines with higher acidity and more herbaceous notes. Diligent producers can still make very good wines, but selection is key. Vintages include: 2007, 2011, 2013, 2021."
+        }
+    };
+
+    const aopDetailsContainer = document.getElementById('aop-details');
+    const aopSelector = document.getElementById('aop-selector');
+    const chartTitleEl = document.getElementById('chart-title');
+    let aopBlendChart, vintageChart;
+
+    function renderAopDetails(aopKey) {
+        const data = aopData[aopKey];
+        if (!data) return;
+
+        aopDetailsContainer.innerHTML = `
+            <h3 class="text-2xl font-semibold text-[#8C2D19] mb-3">${data.title}</h3>
+            <p class="text-gray-600 mb-4">${data.description}</p>
+            <h4 class="font-semibold text-gray-800 mb-2">Primary Styles:</h4>
+            <ul class="list-disc list-inside text-gray-600 space-y-1 mb-4">
+                ${data.styles.map(style => `<li>${style}</li>`).join('')}
+            </ul>
+            <h4 class="font-semibold text-gray-800 mb-2">Benchmark Producers:</h4>
+            <p class="text-gray-600">${data.producers}</p>
+        `;
+        
+        updateBlendChart(data.chart, data.chartTitle);
+
+        aopSelector.querySelectorAll('.aop-button').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.aop === aopKey);
+        });
+    }
+
+    function createBlendChart() {
+        const ctx = document.getElementById('aopBlendChart').getContext('2d');
+        aopBlendChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed !== null) {
+                                    label += context.label + ' ' + context.parsed + '%';
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function updateBlendChart(chartData, title) {
+        chartTitleEl.textContent = title;
+        if (!aopBlendChart) {
+            createBlendChart();
+        }
+        aopBlendChart.data.labels = chartData.labels;
+        aopBlendChart.data.datasets = chartData.datasets;
+        aopBlendChart.update();
+    }
+    
+    aopSelector.addEventListener('click', (e) => {
+        if (e.target.classList.contains('aop-button')) {
+            const aopKey = e.target.dataset.aop;
+            renderAopDetails(aopKey);
+        }
+    });
+
+    function createVintageChart() {
+        const ctx = document.getElementById('vintageChart').getContext('2d');
+        vintageChart = new Chart(ctx, {
+            type: 'bar',
+            data: vintageData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 5,
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(value) {
+                                const labels = ['Poor', 'Fair', 'Good', 'Excellent', 'Legendary'];
+                                return labels[value-1] || '';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                     tooltip: {
+                         callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                const labels = ['Poor', 'Fair', 'Good', 'Excellent', 'Legendary'];
+                                return `Rating: ${labels[value-1]}`;
+                            }
+                         }
+                     }
+                }
+            }
+        });
+    }
+
+    const vintageFilterBtns = document.querySelectorAll('.vintage-btn');
+    const vintageDescriptionEl = document.getElementById('vintage-description');
+    
+    vintageFilterBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const filter = btn.dataset.filter;
+
+            vintageFilterBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            let filteredLabels = [];
+            let filteredData = [];
+            let filteredMeta = [];
+
+            if (filter === 'all') {
+                filteredLabels = vintageData.labels;
+                filteredData = vintageData.datasets[0].data;
+            } else {
+                vintageData.datasets[0].meta.forEach((item, index) => {
+                    if (item.type === filter) {
+                        filteredLabels.push(item.year);
+                        filteredData.push(vintageData.datasets[0].data[index]);
+                    }
+                });
+            }
+
+            vintageChart.data.labels = filteredLabels;
+            vintageChart.data.datasets[0].data = filteredData;
+            vintageChart.update();
+
+            const descriptionData = vintageDescriptions[filter];
+            vintageDescriptionEl.innerHTML = `
+                <h3 class="text-xl font-semibold text-gray-800 mb-2">${descriptionData.title}</h3>
+                <p>${descriptionData.text}</p>
+            `;
+        });
+    });
+
+    function handleNavigation(navContainer) {
+        navContainer.addEventListener('click', (e) => {
+            e.preventDefault();
+            const link = e.target.closest('a');
+            if (link) {
+                const targetId = link.getAttribute('href').substring(1);
+                
+                document.querySelectorAll('.content-section').forEach(section => {
+                    section.classList.remove('active');
+                });
+                document.getElementById(targetId).classList.add('active');
+
+                document.querySelectorAll('.nav-link').forEach(navLink => {
+                    navLink.classList.remove('active');
+                    if (navLink.getAttribute('href') === `#${targetId}`) {
+                        navLink.classList.add('active');
+                    }
+                });
+
+                if(targetId === 'appellations' && !aopBlendChart) {
+                    renderAopDetails('pessac');
+                }
+                if (targetId === 'vintages' && !vintageChart) {
+                    createVintageChart();
+                }
+
+                if (mobileNav.classList.contains('hidden') === false) {
+                     mobileNav.classList.add('hidden');
+                }
+            }
+        });
+    }
+    
+    const mainNav = document.getElementById('main-nav');
+    const mobileMainNav = document.getElementById('mobile-main-nav');
+    handleNavigation(mainNav);
+    handleNavigation(mobileMainNav);
+
+
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileNav = document.getElementById('mobile-nav');
+
+    mobileMenuBtn.addEventListener('click', () => {
+        mobileNav.classList.toggle('hidden');
+    });
+
+    mobileNav.addEventListener('click', (e) => {
+        if (e.target === mobileNav) {
+            mobileNav.classList.add('hidden');
+        }
+    });
+
+    renderAopDetails('pessac');
+});
+</script>
+</body>
+</html>
